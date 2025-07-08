@@ -11,6 +11,10 @@ const cors = require('cors')
 
 app.use(express.json())
 app.use(cors())
+app.use((req, res, next) => {
+  console.log(`[${new Date().toISOString()}] ${req.method} ${req.url}`);
+next();
+})
 mongoose.connect(process.env.Mongo_URI_Public)
 console.log('Connected to MongoDB!')
 const transporter = nodemailer.createTransport({
@@ -158,13 +162,10 @@ app.post('/registers', async (req, res) => {
   try {
     const { name, email, age, address, password } = req.body;
     const hashedPassword = await bcrypt.hash(password, 10);
-   
-    
-    
     const otp = Math.floor(100000 + Math.random() * 900000).toString();
     console.log(otp);
     await transporter.sendMail({
-      from: 'harshlad4920@gmail.com',
+      from: process.env.Email_Public,
       to: email,
       subject: 'OTP for Sign-Up in Parul App',
       text: `Hello ${name} Sir, You otp is  ${otp}.Don't share it with anyone else.`
@@ -236,6 +237,61 @@ app.delete('/users/:id', async (req, res) => {
       return res.status(500).json({error: 'Server error'})      
   }
 });
+app.get('/usersdata/search', async (req, res) => {
+
+  try {
+  const {q} =req.query;
+  const user = await User.find({ $or:[{name: { $regex:q,$options:'i'}},
+     { email: { $regex: q,$options:'i' } },
+   ]});
+    res.json(user);
+  } catch (error) {
+    res.status(500).json({ message: "An error occurred", error });
+  }
+});
+
+app.get('/usersdata/filter', async (req, res) => {
+  try {
+    const min = parseInt(req.query.min) || 0;
+    const max = parseInt(req.query.max) || 100;
+    const user = await User.find({ age: { $gte: min, $lte: max } });
+    res.json(user);
+  } catch (error) {
+    res.status(500).json({ message: "An error occurred", error });
+  }
+});
+app.get('/usersdatapageinate/pageinate', async (req, res) => {
+  try {
+    const page = parseInt(req.query.page) || 1;
+    const limit = parseInt(req.query.limit) || 2;
+    const skip = (page - 1) * limit;
+    const user = await User.find({}).skip(skip).limit(limit)
+    res.json(user);
+  } catch (error) {
+    res.status(500).json({ message: "An error occurred", error });
+  }
+});
+
+app.get('/usersdata/count', async (req, res) => {
+  try {
+    const user = await User.countDocuments({})
+    res.json(user);
+  } catch (error) {
+    res.status(500).json({ message: "An error occurred", error });
+  }
+});
+
+app.get('/usersdata/latestuser', async (req, res) => {
+  try {
+    const n = parseInt(req.query.n) || 1;
+    const user = await User.find().sort({ _id: -1 }).limit(n)
+    res.json(user);
+  } catch (error) {
+    res.status(500).json({ message: "An error occurred", error });
+  }
+});
+
+
 app.listen(port, () => {
   console.log(`Example app listening on port ${port}`)
 })
