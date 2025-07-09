@@ -5,9 +5,13 @@ const nodemailer = require('nodemailer');
 const app = express()
 const port = 3000
 const User = require('./models/Users')
+const jwt = require('jsonwebtoken');
+const authMiddleware = require('./models/middleware/authMiddleware');
 require('dotenv').config();
 // const Product = require('./models/Product')
 const cors = require('cors')
+
+
 
 app.use(express.json())
 app.use(cors())
@@ -24,6 +28,10 @@ const transporter = nodemailer.createTransport({
     pass: process.env.Pass_Public
   }
 });
+// take token form id
+
+
+
 // app.post('/signup', async (req, res) => {
 //   try {
 //     const { name, email, age, address } = req.body;
@@ -187,13 +195,23 @@ app.post('/registers', async (req, res) => {
 app.post('/login', async (req, res) => {  
   try {
     const { email, password } = req.body;
+
     const user = await User.findOne({ email }); 
     
     if (!user) return res.status(400).json({ message: 'User not found' });
     const result = await bcrypt.compare(password, user.password);
     if (!result) return res.status(400).json({ message: 'Invalid password' });
+
+    const token = await jwt.sign(
+      { id: user._id, email: user.email },
+      process.env.SECRET_KEY,
+      { expiresIn: '1h' }
+    );
+
+
     return res.status(200).json({
-      message: 'Login successful'   
+      message: 'Login successful',token
+         
     });
   } catch (error) {
     console.error(error);
@@ -250,7 +268,7 @@ app.get('/usersdata/search', async (req, res) => {
   }
 });
 
-app.get('/usersdata/filter', async (req, res) => {
+app.get('/usersdata/filter', authMiddleware, async (req, res) => {
   try {
     const min = parseInt(req.query.min) || 0;
     const max = parseInt(req.query.max) || 100;
